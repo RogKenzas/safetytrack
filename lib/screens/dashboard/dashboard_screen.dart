@@ -48,7 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  // vertical: 8,
+                  vertical: 8,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -67,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         );
                         await Future.delayed(Duration(seconds: 5));
                         if (context.mounted) {
-                          Navigator.of(context).pop(); // Ferme le loader
+                          Navigator.of(context).pop();
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => RouteTrackingScreen(),

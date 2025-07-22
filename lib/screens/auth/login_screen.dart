@@ -75,14 +75,15 @@ class _LoginScreenState extends State<LoginScreen> {
       _googleErrorMessage = null;
     });
     try {
-      // final user = await _authService.signInWithGoogle();
+      final user = await _authService.signInWithGoogle();
       setState(() => loading = false);
-      // if (user != null) {
-      //   Navigator.pushReplacement(
-      //     context,
-      //     MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-      //   );
-      // }
+      if (user != null) {
+        Navigator.pushReplacement(
+          // ignore: use_build_context_synchronously
+          context,
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      }
     } catch (e) {
       setState(() {
         loading = false;

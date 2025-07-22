@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../services/map_service.dart';
 import 'package:location/location.dart';
 import 'package:flutter_map/src/map/camera/camera.dart';
+import '../../components/forms/custom_text_field.dart';
 
 class AddAddressScreen extends StatefulWidget {
   const AddAddressScreen({super.key});
@@ -77,6 +78,59 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     });
   }
 
+  void _showNameInputModal() {
+    String lieu = '';
+    final TextEditingController _lieuController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Nom du lieu",
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
+                label: "Saisir le nom du lieu",
+                controller: _lieuController,
+                hintText: "Ex: Pharmacie, Bureau, etc.",
+              ),
+              const SizedBox(height: 20),
+              PrimaryButton(
+                label: "Valider",
+                onPressed: () {
+                  if (_lieuController.text.trim().isNotEmpty) {
+                    setState(() {
+                      name = _lieuController.text.trim();
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -112,7 +166,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                       ],
                     ),
           ),
-          // Marqueur visuel centré (au-dessus de la carte)
+          // Marqueur visuel
           if (!_loadingLocation)
             IgnorePointer(
               child: Center(
@@ -151,7 +205,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 ),
               ),
             ),
-          // Barre de recherche personnalisée et bouton retour
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -170,9 +223,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                       child: CustomSearchBar(
                         controller: _searchController,
                         hintText: 'Rechercher',
-                        onChanged: (value) {
-                          // TODO: Ajouter la logique de recherche d'adresse si besoin
-                        },
+                        onChanged: (value) {},
                       ),
                     ),
                   ),
@@ -284,10 +335,17 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                     ),
                                   ),
                                   onSelected: (val) {
-                                    setState(() {
-                                      selectedType = type;
-                                      name = type;
-                                    });
+                                    if (type == 'Autre' && val) {
+                                      setState(() {
+                                        selectedType = type;
+                                      });
+                                      _showNameInputModal();
+                                    } else if (val) {
+                                      setState(() {
+                                        selectedType = type;
+                                        name = type;
+                                      });
+                                    }
                                   },
                                 ),
                               ),
@@ -317,8 +375,49 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      onPressed: () {
-                        // Action d'enregistrement
+                      onPressed: () async {
+                        setState(() {
+                          loading = true;
+                        });
+                        try {
+                          await _mapService.saveAddressForCurrentUser(
+                            name: name,
+                            address: address,
+                            position:
+                                _currentPosition ?? _mapService.initialPosition,
+                            type: selectedType,
+                          );
+                          setState(() {
+                            loading = false;
+                          });
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Adresse enregistrée avec succès !',
+                                ),
+                              ),
+                            );
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const AddressIntroScreen()),
+                            );
+                          }
+                        } catch (e) {
+                          setState(() {
+                            loading = false;
+                          });
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Erreur lors de l\'enregistrement : $e',
+                                ),
+                              ),
+                            );
+                          }
+                        }
                       },
                       child: Text(
                         "Enregistrer l'adresse marquée",

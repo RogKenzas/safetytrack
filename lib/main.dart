@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
 }
 
 class _FirebaseGate extends StatelessWidget {
-  const _FirebaseGate({super.key});
+  const _FirebaseGate();
 
   @override
   Widget build(BuildContext context) {
