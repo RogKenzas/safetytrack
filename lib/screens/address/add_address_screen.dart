@@ -3,6 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:safetytrack/screens/address/address_intro_screen.dart';
 import '../../components/forms/primary_button.dart';
 import '../../components/forms/custom_search_bar.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../services/map_service.dart';
+import 'package:location/location.dart';
+import 'package:flutter_map/src/map/camera/camera.dart';
 
 class AddAddressScreen extends StatefulWidget {
   const AddAddressScreen({super.key});
@@ -12,11 +17,65 @@ class AddAddressScreen extends StatefulWidget {
 }
 
 class _AddAddressScreenState extends State<AddAddressScreen> {
+  final MapService _mapService = MapService();
+  LatLng? _currentPosition;
+  bool _loadingLocation = true;
   bool loading = false;
   String selectedType = 'Maison';
   final List<String> types = ['Maison', 'École', 'Autre'];
   String address = '3.730 Rue Ngoa Ekelle, Yaounde';
   String name = 'Maison';
+  LatLng _mapCenter = LatLng(0, 0);
+  TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    Location location = Location();
+    bool serviceEnabled = await location.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await location.requestService();
+      if (!serviceEnabled) {
+        setState(() => _loadingLocation = false);
+        return;
+      }
+    }
+    PermissionStatus permissionGranted = await location.hasPermission();
+    if (permissionGranted == PermissionStatus.denied) {
+      permissionGranted = await location.requestPermission();
+      if (permissionGranted != PermissionStatus.granted) {
+        setState(() => _loadingLocation = false);
+        return;
+      }
+    }
+    final locData = await location.getLocation();
+    final pos = LatLng(locData.latitude!, locData.longitude!);
+    setState(() {
+      _currentPosition = pos;
+      _mapCenter = pos;
+      _loadingLocation = false;
+    });
+    if (_currentPosition != null) {
+      final newAddress = await _mapService.getAddressFromLatLng(
+        _currentPosition!,
+      );
+      setState(() {
+        address = newAddress;
+      });
+    }
+  }
+
+  Future<void> _updateAddressFromCenter(LatLng center) async {
+    final newAddress = await _mapService.getAddressFromLatLng(center);
+    setState(() {
+      address = newAddress;
+      _currentPosition = center;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,65 +84,120 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       backgroundColor: const Color(0xFFF8FAF9),
       body: Stack(
         children: [
-          // Image de carte en fond (remplacer par ton asset)
-          SizedBox(
-            width: double.infinity,
-            height: double.infinity,
-            child: Image.asset(
-              'assets/img/map_placeholder.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          // Bouton retour + barre de recherche
-          Positioned(
-            top: 38,
-            left: 18,
-            right: 18,
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(50),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 6,
+          // Carte en arrière-plan
+          Positioned.fill(
+            child:
+                _loadingLocation
+                    ? const Center(child: CircularProgressIndicator())
+                    : FlutterMap(
+                      options: MapOptions(
+                        initialCenter:
+                            _currentPosition ?? _mapService.initialPosition,
+                        initialZoom: 16,
+                        onPositionChanged: (MapCamera camera, bool hasGesture) {
+                          if (hasGesture && camera.center != null) {
+                            _mapCenter = camera.center!;
+                            _updateAddressFromCenter(_mapCenter);
+                          }
+                        },
                       ),
-                    ],
-                  ),
-                  child: IconButton(
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                          subdomains: ['a', 'b', 'c', 'd'],
+                          userAgentPackageName: 'com.example.safetytrack',
+                          retinaMode: RetinaMode.isHighDensity(context),
+                        ),
+                      ],
+                    ),
+          ),
+          // Marqueur visuel centré (au-dessus de la carte)
+          if (!_loadingLocation)
+            IgnorePointer(
+              child: Center(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4ADE80).withOpacity(0.25),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 18,
+                      child: Container(
+                        width: 24,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.black, width: 2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Barre de recherche personnalisée et bouton retour
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  IconButton(
                     icon: const Icon(
                       Icons.arrow_back_ios_new,
                       color: Color(0xFF179D5B),
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(child: CustomSearchBar()),
-              ],
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: CustomSearchBar(
+                        controller: _searchController,
+                        hintText: 'Rechercher',
+                        onChanged: (value) {
+                          // TODO: Ajouter la logique de recherche d'adresse si besoin
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          // Modale fixe en bas
-          Align(
-            alignment: Alignment.bottomCenter,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-              decoration: const BoxDecoration(
+              height: 320,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(28),
-                  topRight: Radius.circular(28),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 12,
-                    offset: Offset(0, -2),
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
                   ),
                 ],
               ),
@@ -95,22 +209,23 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     child: Container(
                       width: 40,
                       height: 4,
-                      margin: const EdgeInsets.only(bottom: 18),
+                      margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
+                  const SizedBox(height: 4),
                   Text(
-                    'Enregistrer votre position exacte permet un suivi précis.',
+                    "Enregistrer votre position exacte permet un suivi précis.",
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: Colors.black87,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children:
@@ -179,60 +294,41 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                             )
                             .toList(),
                   ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Nom',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(name, style: GoogleFonts.poppins(fontSize: 15)),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Adresse',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(address, style: GoogleFonts.poppins(fontSize: 15)),
-                      ],
-                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Nom",
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(height: 24),
-                  PrimaryButton(
-                    label: 'Enregistrer l’adresse marquée',
-                    loading: loading,
-                    onPressed:
-                        loading
-                            ? null
-                            : () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AddressIntroScreen(),
-                                ),
-                              );
-                            },
+                  Text(name, style: GoogleFonts.poppins(fontSize: 15)),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Adresse",
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                  ),
+                  Text(address, style: GoogleFonts.poppins(fontSize: 15)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF179D5B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: () {
+                        // Action d'enregistrement
+                      },
+                      child: Text(
+                        "Enregistrer l'adresse marquée",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

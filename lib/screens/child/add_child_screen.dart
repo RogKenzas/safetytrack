@@ -13,7 +13,6 @@ class AddChildScreen extends StatefulWidget {
 
 class _AddChildScreenState extends State<AddChildScreen> {
   bool loading = false;
-  // Simulé, pas de vraie image pour l'instant
   String? imagePath;
 
   void _onAdd() async {
@@ -64,7 +63,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
                 const SizedBox(height: 24),
                 Center(
                   child: GestureDetector(
-                    onTap: () {}, // Simulation, pas d'upload réel
+                    onTap: () {},
                     child: Container(
                       width: 110,
                       height: 110,
@@ -83,7 +82,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
                                 size: 40,
                                 color: Colors.grey.shade600,
                               )
-                              : null, // Affichage image simulé
+                              : null,
                     ),
                   ),
                 ),

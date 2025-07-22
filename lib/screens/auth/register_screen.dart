@@ -4,6 +4,7 @@ import '../../components/forms/primary_button.dart';
 import '../../components/forms/secondary_button.dart';
 import '../../components/forms/custom_text_field.dart';
 import 'login_screen.dart';
+import '../../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,14 +15,44 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   bool loading = false;
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   void _onRegister() async {
-    setState(() => loading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => loading = false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Compte créé (simulation)')));
+    setState(() {
+      loading = true;
+      _errorMessage = null;
+    });
+    try {
+      final user = await _authService.registerWithEmail(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+        name: _nameController.text.trim(),
+      );
+      setState(() => loading = false);
+      if (user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Compte créé avec succès !')),
+        );
+        // Optionnel : Naviguer vers la page de connexion ou dashboard
+      }
+    } catch (e) {
+      setState(() {
+        loading = false;
+        _errorMessage = e.toString();
+      });
+    }
   }
 
   void _goToLogin() {
@@ -60,13 +91,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                const CustomTextField(label: 'Nom*'),
+                CustomTextField(label: 'Nom*', controller: _nameController),
                 const SizedBox(height: 20),
-                const CustomTextField(label: 'Adresse e-mail*'),
+                CustomTextField(
+                  label: 'Adresse e-mail*',
+                  controller: _emailController,
+                ),
                 const SizedBox(height: 20),
-                const CustomTextField(
+                CustomTextField(
                   label: 'Mot de passe*',
                   obscureText: true,
+                  controller: _passwordController,
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -104,6 +139,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   loading: loading,
                   onPressed: loading ? null : _onRegister,
                 ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   children: [

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../components/forms/primary_button.dart';
 import '../../components/forms/custom_text_field.dart';
 import 'login_screen.dart';
+import '../../services/auth_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -13,15 +14,35 @@ class ResetPasswordScreen extends StatefulWidget {
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool loading = false;
+  final _emailController = TextEditingController();
+  final AuthService _authService = AuthService();
+  String? _errorMessage;
+  String? _successMessage;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
 
   void _onReset() async {
-    setState(() => loading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => loading = false);
-    // Navigation simulée (à remplacer par la vraie page d'accueil plus tard)
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mot de passe réinitialisé (simulation)')),
-    );
+    setState(() {
+      loading = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+    try {
+      await _authService.resetPassword(_emailController.text.trim());
+      setState(() {
+        loading = false;
+        _successMessage = 'Un email de réinitialisation a été envoyé.';
+      });
+    } catch (e) {
+      setState(() {
+        loading = false;
+        _errorMessage = e.toString();
+      });
+    }
   }
 
   void _goToLogin() {
@@ -60,6 +81,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
+                CustomTextField(
+                  label: 'Adresse e-mail',
+                  controller: _emailController,
+                ),
+                const SizedBox(height: 20),
                 const CustomTextField(
                   label: 'Mot de passe*',
                   obscureText: true,
@@ -105,6 +131,54 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   loading: loading,
                   onPressed: loading ? null : _onReset,
                 ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (_successMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _successMessage!,
+                            style: const TextStyle(color: Colors.green),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: loading ? null : _goToLogin,
