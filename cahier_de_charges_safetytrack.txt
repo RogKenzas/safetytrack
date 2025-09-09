@@ -1,0 +1,133 @@
+CAHIER DE CHARGES - APPLICATION SAFETYTRACK
+============================================
+
+1. PRÉSENTATION DU PROJET
+--------------------------
+
+SafetyTrack est une application mobile de sécurité et de suivi en temps réel 
+développée en Flutter. Elle permet aux parents de surveiller leurs enfants 
+et de recevoir des alertes en cas de danger.
+
+Public cible : Parents, tuteurs, institutions éducatives
+Plateformes : Android, iOS, Web
+
+2. FONCTIONNALITÉS PRINCIPALES
+-------------------------------
+
+2.1 Authentification
+- Connexion email/mot de passe
+- Authentification Google
+- Inscription et réinitialisation de mot de passe
+
+2.2 Tableau de Bord
+- Interface d'accueil avec navigation
+- Monitoring de proximité automatique
+- Affichage de l'heure en temps réel
+- Navigation par onglets (Accueil, Planning, Historique, Urgence)
+
+2.3 Gestion des Enfants
+- Ajout d'enfants avec informations personnelles
+- Association d'adresses aux enfants
+- Suivi de la localisation
+
+2.4 Gestion des Adresses
+- Ajout d'adresses personnelles
+- Marquage d'adresses sur carte
+- Géolocalisation automatique
+
+2.5 Zones d'Alerte
+- Création de zones de risque personnalisées
+- Alertes automatiques lors d'entrée en zone
+- Visualisation sur carte interactive
+
+2.6 Suivi de Route
+- Suivi en temps réel des déplacements
+- Affichage de la position actuelle
+- Historique des trajets
+
+2.7 Système d'Alerte Panique
+- Alertes visuelles et sonores
+- Compte à rebours de 6 secondes
+- Détection automatique d'entrée en zone de risque
+
+2.8 Gestion des Institutions
+- Ajout d'institutions (écoles, centres)
+- Vérification par token
+- Association enfants-institutions
+
+3. ARCHITECTURE TECHNIQUE
+--------------------------
+
+Technologies :
+- Flutter 3.7.2+
+- Firebase (Auth, Firestore)
+- Géolocalisation (Location, Geocoding)
+- Cartes (Flutter Map, LatLng2)
+- Google Fonts (Poppins)
+
+Structure :
+- Composants réutilisables
+- Services métier
+- Écrans organisés par fonctionnalité
+- Thème personnalisé
+
+4. INTERFACE UTILISATEUR
+-------------------------
+
+Design System :
+- Couleur primaire : #179D5B (Vert)
+- Couleur de fond : #F8FAF9
+- Police : Google Fonts Poppins
+- Style Material Design 3
+
+5. SÉCURITÉ
+-------------
+
+- Authentification sécurisée Firebase
+- Permissions de géolocalisation
+- Protection des données personnelles
+- Alertes en temps réel
+
+6. PERFORMANCES
+---------------
+
+- Monitoring de proximité toutes les 10 secondes
+- Optimisation des requêtes Firebase
+- Gestion de la mémoire
+- Cache local
+
+7. DÉPLOIEMENT
+---------------
+
+- Configuration Firebase
+- Build multi-plateformes
+- Publication sur stores
+- Maintenance continue
+
+8. FONCTIONNALITÉS FUTURES
+---------------------------
+
+- Mode hors ligne
+- Synchronisation multi-appareils
+- Intelligence artificielle
+- API pour développeurs tiers
+
+9. CONTRAINTES
+--------------
+
+- Dépendance internet
+- Consommation batterie
+- Permissions système
+- Conformité RGPD
+
+10. PLANNING
+-------------
+
+Phase 1 : MVP (Authentification, Dashboard, Géolocalisation)
+Phase 2 : Fonctionnalités avancées (Alertes, Zones)
+Phase 3 : Optimisations et tests
+Phase 4 : Déploiement et maintenance
+
+============================================
+FIN DU CAHIER DE CHARGES
+============================================ 

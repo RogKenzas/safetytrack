@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/auth/login_screen.dart';
+import 'package:provider/provider.dart';
+import 'screens/auth/auth_wrapper.dart';
+import 'screens/profile/profile_screen.dart';
+import 'services/auth_state_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -15,15 +18,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SafetyTrack',
-      theme: ThemeData(
-        textTheme: GoogleFonts.poppinsTextTheme(),
-        primaryColor: const Color(0xFF179D5B),
-        scaffoldBackgroundColor: const Color(0xFFF8FAF9),
+    return ChangeNotifierProvider(
+      create: (context) => AuthStateService(),
+      child: MaterialApp(
+        title: 'SafetyTrack',
+        theme: ThemeData(
+          textTheme: GoogleFonts.poppinsTextTheme(),
+          primaryColor: const Color(0xFF179D5B),
+          scaffoldBackgroundColor: const Color(0xFFF8FAF9),
+        ),
+        home: const _FirebaseGate(),
+        routes: {'/profile': (context) => const ProfileScreen()},
+        debugShowCheckedModeBanner: false,
       ),
-      home: const _FirebaseGate(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -39,10 +46,10 @@ class _FirebaseGate extends StatelessWidget {
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
-          return const LoginScreen();
+          return const AuthWrapper();
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Erreur Firebase :\n a${snapshot.error}'));
+          return Center(child: Text('Erreur Firebase :\n ${snapshot.error}'));
         }
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       },

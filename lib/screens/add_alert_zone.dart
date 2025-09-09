@@ -6,29 +6,23 @@ import 'package:location/location.dart';
 import 'package:safetytrack/services/auth_service.dart';
 import 'package:safetytrack/services/map_service.dart';
 
-class RouteTrackingScreen extends StatefulWidget {
-  const RouteTrackingScreen({super.key});
+class AddAlertZone extends StatefulWidget {
+  const AddAlertZone({super.key});
 
   @override
-  State<RouteTrackingScreen> createState() => _RouteTrackingScreenState();
+  State<AddAlertZone> createState() => AddAlertZoneState();
 }
 
-class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
+class AddAlertZoneState extends State<AddAlertZone> {
   final MapService _mapService = MapService();
   final AuthService _authService = AuthService();
+  LatLng _mapCenter = LatLng(0, 0);
   LatLng? _currentPosition;
   String address = '3.730 Rue Ngoa Ekelle, Yaounde';
   bool _loadingLocation = true;
   List<Map<String, dynamic>> _childrenAddresses = [];
   List<Map<String, dynamic>> _userAddresses = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _getCurrentLocation();
-    _loadChildrenAddresses();
-    _loadUserAddresses();
-  }
+  List<Map<String, dynamic>> _riskZones = []; // Zones de risque ajoutées
 
   Future<void> _loadChildrenAddresses() async {
     try {
@@ -50,6 +44,26 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
     } catch (e) {
       print('Erreur lors du chargement des adresses utilisateur: $e');
     }
+  }
+
+  Future<void> _loadRiskZones() async {
+    try {
+      final riskZones = await _authService.getCurrentUserRiskZones();
+      setState(() {
+        _riskZones = riskZones;
+      });
+    } catch (e) {
+      print('Erreur lors du chargement des zones de risque: $e');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+    _loadChildrenAddresses();
+    _loadUserAddresses();
+    _loadRiskZones();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -75,6 +89,7 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
       final pos = LatLng(locData.latitude!, locData.longitude!);
       setState(() {
         _currentPosition = pos;
+        _mapCenter = pos;
         _loadingLocation = false;
       });
       if (_currentPosition != null) {
@@ -90,10 +105,119 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
       // Position par défaut pour le web
       setState(() {
         _currentPosition = _mapService.initialPosition;
+        _mapCenter = _mapService.initialPosition;
         _loadingLocation = false;
         address = 'Position par défaut';
       });
     }
+  }
+
+  void _onMapTap(TapPosition tapPosition, LatLng position) {
+    _handleMapTap(position);
+  }
+
+  Future<void> _handleMapTap(LatLng position) async {
+    try {
+      final address = await _mapService.getAddressFromLatLng(position);
+
+      final name = await _showRiskZoneDialog();
+      if (name != null && name.isNotEmpty) {
+        final riskZone = {
+          'name': name,
+          'address': address,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'type': 'Zone de risque',
+          'createdAt': DateTime.now().toIso8601String(),
+        };
+
+        setState(() {
+          _riskZones.add(riskZone);
+        });
+
+        try {
+          await _mapService.saveRiskZone(
+            name: name,
+            address: address,
+            position: position,
+            type: 'Zone de risque',
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Zone de risque "$name" ajoutée avec succès !'),
+                backgroundColor: const Color(0xFF179D5B),
+                duration: Duration(seconds: 2),
+              ),
+            );
+            
+            // Retourner à l'onboarding après un délai
+            Future.delayed(Duration(seconds: 2), () {
+              if (mounted) {
+                Navigator.pop(context);
+              }
+            });
+          }
+        } catch (firestoreError) {
+          print(
+            'Erreur Firestore (mais zone ajoutée localement): $firestoreError',
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Zone "$name" ajoutée localement. Vérifiez les permissions Firestore.',
+                ),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Erreur lors de l\'ajout de la zone de risque: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout de la zone de risque: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _showRiskZoneDialog() async {
+    final TextEditingController nameController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Nommer la zone de risque',
+              style: GoogleFonts.poppins(),
+            ),
+            content: TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nom de la zone',
+                hintText: 'Ex: Zone dangereuse, Rue sombre...',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(nameController.text),
+                child: const Text('Ajouter'),
+              ),
+            ],
+          ),
+    );
   }
 
   Widget _buildUserMarker() {
@@ -128,16 +252,6 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
             border: Border.all(color: Colors.black, width: 2),
           ),
         ),
-        ..._userAddresses.map((address) {
-          final lat = address['latitude'] as double?;
-          final lng = address['longitude'] as double?;
-          final type = address['type'] as String? ?? 'Autre';
-
-          if (lat != null && lng != null) {
-            return Positioned(left: 0, top: 0, child: _buildChildMarker(type));
-          }
-          return const SizedBox.shrink();
-        }).toList(),
       ],
     );
   }
@@ -192,8 +306,102 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
     );
   }
 
+  Widget _buildUserAddressMarker(String type) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: Colors.amber.withOpacity(0.25),
+            shape: BoxShape.circle,
+          ),
+        ),
+        Positioned(
+          bottom: 18,
+          child: Container(
+            width: 24,
+            height: 8,
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.amber, width: 2),
+          ),
+          child: _getIconForType(type),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRiskZoneMarker() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.25),
+            shape: BoxShape.circle,
+          ),
+        ),
+        Positioned(
+          bottom: 18,
+          child: Container(
+            width: 24,
+            height: 8,
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.red, width: 2),
+          ),
+          child: const Center(
+            child: Icon(Icons.warning, size: 16, color: Colors.red),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _getIconForType(String type) {
+    switch (type) {
+      case 'Maison':
+        return const Center(
+          child: Icon(Icons.home, size: 16, color: Colors.amber),
+        );
+      case 'École':
+        return const Center(
+          child: Icon(Icons.school, size: 16, color: Colors.amber),
+        );
+      default:
+        return const Center(
+          child: Icon(Icons.location_on, size: 16, color: Colors.amber),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: Stack(
@@ -211,6 +419,7 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
                         initialCenter:
                             _currentPosition ?? _mapService.initialPosition,
                         initialZoom: 16,
+                        onTap: _onMapTap,
                       ),
                       children: [
                         TileLayer(
@@ -230,6 +439,26 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
                                 alignment: Alignment.center,
                                 child: _buildUserMarker(),
                               ),
+                              ..._userAddresses
+                                  .map((address) {
+                                    final lat = address['latitude'] as double?;
+                                    final lng = address['longitude'] as double?;
+                                    final type =
+                                        address['type'] as String? ?? 'Autre';
+
+                                    if (lat != null && lng != null) {
+                                      return Marker(
+                                        point: LatLng(lat, lng),
+                                        width: 60,
+                                        height: 60,
+                                        alignment: Alignment.center,
+                                        child: _buildUserAddressMarker(type),
+                                      );
+                                    }
+                                    return null;
+                                  })
+                                  .whereType<Marker>()
+                                  .toList(),
                               ..._childrenAddresses
                                   .map((address) {
                                     final lat = address['latitude'] as double?;
@@ -244,6 +473,24 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen> {
                                         height: 60,
                                         alignment: Alignment.center,
                                         child: _buildChildMarker(type),
+                                      );
+                                    }
+                                    return null;
+                                  })
+                                  .whereType<Marker>()
+                                  .toList(),
+                              ..._riskZones
+                                  .map((zone) {
+                                    final lat = zone['latitude'] as double?;
+                                    final lng = zone['longitude'] as double?;
+
+                                    if (lat != null && lng != null) {
+                                      return Marker(
+                                        point: LatLng(lat, lng),
+                                        width: 60,
+                                        height: 60,
+                                        alignment: Alignment.center,
+                                        child: _buildRiskZoneMarker(),
                                       );
                                     }
                                     return null;

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class CustomBottomNavbar extends StatelessWidget {
@@ -37,8 +38,8 @@ class CustomBottomNavbar extends StatelessWidget {
             onTap: () => onTap(0),
           ),
           _NavItem(
-            icon: Icons.event_note,
-            label: 'Planning',
+            icon: CupertinoIcons.placemark_fill,
+            label: 'Adresse',
             selected: currentIndex == 1,
             onTap: () => onTap(1),
           ),

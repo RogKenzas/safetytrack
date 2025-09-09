@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:safetytrack/screens/auth/auth_wrapper.dart';
 import '../../components/forms/primary_button.dart';
 import '../../components/forms/secondary_button.dart';
 import '../../components/forms/custom_text_field.dart';
@@ -15,6 +16,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   bool loading = false;
+  bool isParentAccount = true; // true = parent, false = enfant
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -39,13 +41,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
         name: _nameController.text.trim(),
+        accountType: isParentAccount ? 'parent' : 'child',
       );
       setState(() => loading = false);
-      if (user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Compte créé avec succès !')),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isParentAccount
+                ? 'Compte parent créé avec succès !'
+                : 'Compte enfant créé avec succès !',
+          ),
+        ),
+      );
+      // Laisser le flux continuer automatiquement via AuthWrapper
+      if (mounted && user != null) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          (route) => false,
         );
-        // Optionnel : Naviguer vers la page de connexion ou dashboard
       }
     } catch (e) {
       setState(() {
@@ -91,6 +104,130 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
+
+                // Toggle pour choisir le type de compte
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Type de compte',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap:
+                                  () => setState(() => isParentAccount = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isParentAccount
+                                          ? const Color(0xFF179D5B)
+                                          : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.family_restroom,
+                                      color:
+                                          isParentAccount
+                                              ? Colors.white
+                                              : Colors.grey.shade600,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Parent',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        color:
+                                            isParentAccount
+                                                ? Colors.white
+                                                : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap:
+                                  () => setState(() => isParentAccount = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      !isParentAccount
+                                          ? const Color(0xFF179D5B)
+                                          : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.child_care,
+                                      color:
+                                          !isParentAccount
+                                              ? Colors.white
+                                              : Colors.grey.shade600,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Enfant',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        color:
+                                            !isParentAccount
+                                                ? Colors.white
+                                                : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isParentAccount
+                            ? 'Vous pourrez ajouter des comptes enfants et suivre leur localisation'
+                            : 'Votre compte sera lié à un compte parent pour la surveillance',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
                 CustomTextField(label: 'Nom*', controller: _nameController),
                 const SizedBox(height: 20),
                 CustomTextField(

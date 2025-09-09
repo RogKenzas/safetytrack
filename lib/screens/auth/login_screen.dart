@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:safetytrack/screens/auth/auth_wrapper.dart';
 import '../../components/forms/primary_button.dart';
 import '../../components/forms/secondary_button.dart';
 import '../../components/forms/custom_text_field.dart';
@@ -41,10 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text.trim(),
       );
       setState(() => loading = false);
-      if (user != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      // Rediriger vers l'auth wrapper pour laisser le flux décider (Onboarding/Dashboard)
+      if (mounted && user != null) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -77,13 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final user = await _authService.signInWithGoogle();
       setState(() => loading = false);
-      if (user != null) {
-        Navigator.pushReplacement(
-          // ignore: use_build_context_synchronously
-          context,
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-        );
-      }
+      // La redirection se fera automatiquement via AuthStateService
     } catch (e) {
       setState(() {
         loading = false;

@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../components/forms/primary_button.dart';
-import '../../components/forms/custom_text_field.dart';
-import '../address/add_address_screen.dart';
+import 'package:safetytrack/components/forms/custom_text_field.dart';
+import 'package:safetytrack/components/forms/primary_button.dart';
+import 'package:safetytrack/screens/address/add_address_screen.dart';
+import '../../services/auth_service.dart';
 
 class AddChildScreen extends StatefulWidget {
   const AddChildScreen({super.key});
@@ -13,16 +16,51 @@ class AddChildScreen extends StatefulWidget {
 
 class _AddChildScreenState extends State<AddChildScreen> {
   bool loading = false;
-  String? imagePath;
+  final TextEditingController _emailController = TextEditingController();
+  List<String> _suggestions = [];
+  final AuthService _authService = AuthService();
+  String? _selectedEmail;
+  Future<void> _fetchSuggestions(String input) async {
+    final suggestions = await _authService.suggestChildEmails(input);
+    setState(() {
+      _suggestions = suggestions;
+    });
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
 
   void _onAdd() async {
+    if (_selectedEmail == null) return;
     setState(() => loading = true);
-    await Future.delayed(const Duration(seconds: 1));
+    final childData = await _authService.getUserByEmail(_selectedEmail!);
+    if (childData != null) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await _authService.linkChildToParent(
+          parentUid: user.uid,
+          childUid: childData['uid'],
+          childEmail: childData['email'],
+          childName: childData['name'] ?? 'Enfant',
+        );
+      }
+    }
     setState(() => loading = false);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AddAddressScreen()),
+
+    // Afficher un message de succès
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Enfant ajouté avec succès !'),
+        backgroundColor: Color(0xFF179D5B),
+        duration: Duration(seconds: 2),
+      ),
     );
+
+    // Retourner à l'onboarding pour continuer le flux
+    Navigator.pop(context);
   }
 
   @override
@@ -37,7 +75,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
               children: [
                 const SizedBox(height: 40),
                 Text(
-                  'Ajoutez les informations de votre enfant',
+                  'Ajoutez le compte enfant',
                   style: GoogleFonts.poppins(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
@@ -46,7 +84,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Le nom, l’âge et la photo de votre enfant nous aident à assurer sa sécurité.',
+                  'Saisissez l\'adresse email du compte enfant. Les suggestions s\'affichent automatiquement.',
                   style: GoogleFonts.poppins(
                     fontSize: 15,
                     color: Colors.black87,
@@ -54,53 +92,56 @@ class _AddChildScreenState extends State<AddChildScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                const CustomTextField(label: 'Nom de l’enfant'),
-                const SizedBox(height: 20),
-                const CustomTextField(
-                  label: 'Âge',
-                  keyboardType: TextInputType.number,
+                CustomTextField(
+                  label: 'Email du compte enfant',
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: (value) {
+                    _selectedEmail = null;
+                    _fetchSuggestions(value);
+                  },
                 ),
-                const SizedBox(height: 24),
-                Center(
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      width: 110,
-                      height: 110,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5EF),
-                        borderRadius: BorderRadius.circular(60),
-                        border: Border.all(
-                          color: const Color(0xFF179D5B),
-                          width: 2,
+                if (_suggestions.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 4,
                         ),
-                      ),
-                      child:
-                          imagePath == null
-                              ? Icon(
-                                Icons.camera_alt,
-                                size: 40,
-                                color: Colors.grey.shade600,
-                              )
-                              : null,
+                      ],
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _suggestions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final email = _suggestions[index];
+                        return ListTile(
+                          title: Text(
+                            email,
+                            style: GoogleFonts.poppins(fontSize: 15),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _emailController.text = email;
+                              _selectedEmail = email;
+                              _suggestions = [];
+                            });
+                          },
+                        );
+                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Center(
-                  child: Text(
-                    'Ajouter une photo',
-                    style: GoogleFonts.poppins(
-                      color: const Color(0xFF179D5B),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 32),
                 PrimaryButton(
                   label: 'Ajouter',
                   loading: loading,
-                  onPressed: loading ? null : _onAdd,
+                  onPressed: loading || _selectedEmail == null ? null : _onAdd,
                 ),
               ],
             ),

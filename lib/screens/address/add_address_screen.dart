@@ -36,36 +36,47 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
-    Location location = Location();
-    bool serviceEnabled = await location.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await location.requestService();
+    try {
+      Location location = Location();
+      bool serviceEnabled = await location.serviceEnabled();
       if (!serviceEnabled) {
-        setState(() => _loadingLocation = false);
-        return;
+        serviceEnabled = await location.requestService();
+        if (!serviceEnabled) {
+          setState(() => _loadingLocation = false);
+          return;
+        }
       }
-    }
-    PermissionStatus permissionGranted = await location.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted = await location.requestPermission();
-      if (permissionGranted != PermissionStatus.granted) {
-        setState(() => _loadingLocation = false);
-        return;
+      PermissionStatus permissionGranted = await location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) {
+          setState(() => _loadingLocation = false);
+          return;
+        }
       }
-    }
-    final locData = await location.getLocation();
-    final pos = LatLng(locData.latitude!, locData.longitude!);
-    setState(() {
-      _currentPosition = pos;
-      _mapCenter = pos;
-      _loadingLocation = false;
-    });
-    if (_currentPosition != null) {
-      final newAddress = await _mapService.getAddressFromLatLng(
-        _currentPosition!,
-      );
+      final locData = await location.getLocation();
+      final pos = LatLng(locData.latitude!, locData.longitude!);
       setState(() {
-        address = newAddress;
+        _currentPosition = pos;
+        _mapCenter = pos;
+        _loadingLocation = false;
+      });
+      if (_currentPosition != null) {
+        final newAddress = await _mapService.getAddressFromLatLng(
+          _currentPosition!,
+        );
+        setState(() {
+          address = newAddress;
+        });
+      }
+    } catch (e) {
+      print('Erreur de géolocalisation (probablement sur web): $e');
+      // Position par défaut pour le web
+      setState(() {
+        _currentPosition = _mapService.initialPosition;
+        _mapCenter = _mapService.initialPosition;
+        _loadingLocation = false;
+        address = 'Position par défaut';
       });
     }
   }
@@ -181,6 +192,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         shape: BoxShape.circle,
                       ),
                     ),
+                    // Ombre sous le marqueur
                     Positioned(
                       bottom: 18,
                       child: Container(
@@ -192,6 +204,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         ),
                       ),
                     ),
+                    // Rond blanc avec contour noir
                     Container(
                       width: 24,
                       height: 24,
@@ -200,6 +213,24 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.black, width: 2),
                       ),
+                      child:
+                          (selectedType == 'Maison')
+                              ? const Center(
+                                child: Icon(
+                                  Icons.home,
+                                  size: 16,
+                                  color: Color(0xFF179D5B),
+                                ),
+                              )
+                              : (selectedType == 'École')
+                              ? const Center(
+                                child: Icon(
+                                  Icons.school,
+                                  size: 16,
+                                  color: Color(0xFF179D5B),
+                                ),
+                              )
+                              : null,
                     ),
                   ],
                 ),
@@ -401,7 +432,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const AddressIntroScreen()),
+                                builder: (_) => const AddressIntroScreen(),
+                              ),
                             );
                           }
                         } catch (e) {

@@ -1,0 +1,197 @@
+@startuml SafetyTrack_UseCase_Diagram
+
+!theme plain
+skinparam backgroundColor #F8FAF9
+skinparam actorBackgroundColor #179D5B
+skinparam actorBorderColor #179D5B
+skinparam usecaseBackgroundColor #E8F5EF
+skinparam usecaseBorderColor #179D5B
+skinparam packageBackgroundColor #FFFFFF
+skinparam packageBorderColor #179D5B
+
+title Diagramme de Cas d'Utilisation - SafetyTrack
+
+' Acteurs
+actor "Parent/Tuteur" as Parent #179D5B
+actor "Enfant" as Child #4CAF50
+actor "Système de Géolocalisation" as GPS #FF9800
+actor "Firebase" as Firebase #2196F3
+
+' Package Authentification
+package "Authentification" {
+    usecase "Se connecter" as UC1
+    usecase "S'inscrire" as UC2
+    usecase "Réinitialiser mot de passe" as UC3
+    usecase "Se déconnecter" as UC4
+    usecase "Authentification Google" as UC5
+}
+
+' Package Gestion des Comptes
+package "Gestion des Comptes" {
+    usecase "Créer compte enfant" as UC6
+    usecase "Lier compte enfant" as UC7
+    usecase "Gérer profil" as UC8
+    usecase "Configurer type de compte" as UC9
+}
+
+' Package Onboarding
+package "Configuration Initiale" {
+    usecase "Compléter onboarding" as UC10
+    usecase "Configurer zones d'alerte" as UC11
+    usecase "Ajouter adresses importantes" as UC12
+    usecase "Finaliser configuration" as UC13
+}
+
+' Package Géolocalisation
+package "Géolocalisation et Suivi" {
+    usecase "Obtenir position GPS" as UC14
+    usecase "Mettre à jour position" as UC15
+    usecase "Géocoder adresse" as UC16
+    usecase "Suivre enfant en temps réel" as UC17
+    usecase "Afficher position sur carte" as UC18
+}
+
+' Package Zones d'Alerte
+package "Gestion des Zones d'Alerte" {
+    usecase "Créer zone d'alerte" as UC19
+    usecase "Marquer zone sur carte" as UC20
+    usecase "Nommer zone d'alerte" as UC21
+    usecase "Détecter entrée en zone" as UC22
+    usecase "Déclencher alerte panique" as UC23
+    usecase "Propager zones aux enfants" as UC24
+}
+
+' Package Gestion des Adresses
+package "Gestion des Adresses" {
+    usecase "Ajouter adresse personnelle" as UC25
+    usecase "Marquer adresse sur carte" as UC26
+    usecase "Classifier adresse (Maison/École)" as UC27
+    usecase "Synchroniser adresses parent-enfant" as UC28
+    usecase "Géolocaliser automatiquement" as UC29
+}
+
+' Package Tableaux de Bord
+package "Tableaux de Bord" {
+    usecase "Accéder dashboard parent" as UC30
+    usecase "Accéder dashboard enfant" as UC31
+    usecase "Visualiser carte interactive" as UC32
+    usecase "Naviguer par onglets" as UC33
+    usecase "Afficher statut enfants" as UC34
+    usecase "Monitoring temps réel" as UC35
+}
+
+' Package Système d'Alertes
+package "Système d'Alertes" {
+    usecase "Recevoir notification proximité" as UC36
+    usecase "Afficher interface panique" as UC37
+    usecase "Compte à rebours urgence" as UC38
+    usecase "Appeler numéro d'urgence" as UC39
+    usecase "Localiser en urgence" as UC40
+    usecase "Envoyer notification push" as UC41
+}
+
+' Package Synchronisation
+package "Synchronisation" {
+    usecase "Synchroniser données parent-enfant" as UC42
+    usecase "Propager zones d'alerte" as UC43
+    usecase "Mettre à jour temps réel" as UC44
+    usecase "Gérer connectivité" as UC45
+}
+
+' Relations Parent
+Parent --> UC1 : utilise
+Parent --> UC2 : utilise
+Parent --> UC3 : utilise
+Parent --> UC4 : utilise
+Parent --> UC5 : utilise
+Parent --> UC6 : utilise
+Parent --> UC7 : utilise
+Parent --> UC8 : utilise
+Parent --> UC9 : utilise
+Parent --> UC10 : utilise
+Parent --> UC11 : utilise
+Parent --> UC12 : utilise
+Parent --> UC13 : utilise
+Parent --> UC17 : utilise
+Parent --> UC18 : utilise
+Parent --> UC19 : utilise
+Parent --> UC20 : utilise
+Parent --> UC21 : utilise
+Parent --> UC24 : utilise
+Parent --> UC25 : utilise
+Parent --> UC26 : utilise
+Parent --> UC27 : utilise
+Parent --> UC28 : utilise
+Parent --> UC30 : utilise
+Parent --> UC32 : utilise
+Parent --> UC33 : utilise
+Parent --> UC34 : utilise
+Parent --> UC35 : utilise
+Parent --> UC36 : reçoit
+Parent --> UC40 : utilise
+Parent --> UC42 : utilise
+Parent --> UC43 : utilise
+
+' Relations Enfant
+Child --> UC1 : utilise
+Child --> UC2 : utilise
+Child --> UC3 : utilise
+Child --> UC4 : utilise
+Child --> UC5 : utilise
+Child --> UC8 : utilise
+Child --> UC15 : utilise
+Child --> UC18 : utilise
+Child --> UC22 : déclenche
+Child --> UC23 : déclenche
+Child --> UC28 : bénéficie
+Child --> UC31 : utilise
+Child --> UC32 : utilise
+Child --> UC37 : déclenche
+Child --> UC38 : déclenche
+Child --> UC39 : utilise
+Child --> UC44 : bénéficie
+
+' Relations Système
+GPS --> UC14 : fournit
+GPS --> UC15 : fournit
+GPS --> UC16 : fournit
+GPS --> UC29 : fournit
+
+Firebase --> UC1 : authentifie
+Firebase --> UC2 : authentifie
+Firebase --> UC3 : authentifie
+Firebase --> UC5 : authentifie
+Firebase --> UC42 : synchronise
+Firebase --> UC43 : synchronise
+Firebase --> UC44 : synchronise
+Firebase --> UC41 : envoie
+
+' Relations d'inclusion et d'extension
+UC10 ..> UC11 : inclut
+UC10 ..> UC12 : inclut
+UC10 ..> UC13 : inclut
+UC19 ..> UC20 : inclut
+UC19 ..> UC21 : inclut
+UC19 ..> UC24 : inclut
+UC25 ..> UC26 : inclut
+UC25 ..> UC27 : inclut
+UC25 ..> UC29 : inclut
+UC22 ..> UC23 : étend
+UC23 ..> UC37 : étend
+UC23 ..> UC38 : étend
+UC37 ..> UC39 : étend
+UC37 ..> UC40 : étend
+UC17 ..> UC35 : inclut
+UC30 ..> UC32 : inclut
+UC30 ..> UC33 : inclut
+UC30 ..> UC34 : inclut
+UC31 ..> UC32 : inclut
+
+' Relations de dépendance
+UC14 ..> UC15 : précède
+UC15 ..> UC17 : précède
+UC17 ..> UC22 : précède
+UC22 ..> UC36 : précède
+UC36 ..> UC37 : précède
+
+@enduml
