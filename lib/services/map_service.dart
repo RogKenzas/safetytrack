@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:location/location.dart' as location_package;
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
+import '../utils/web_location_helper.dart';
 
 class MapService {
   // Position par défaut (Yaoundé, Cameroun) utilisée en fallback si la géolocalisation échoue
@@ -27,9 +29,15 @@ class MapService {
     markers.clear();
   }
 
-  /// Get current user position
+  /// Get current user position with web compatibility
   Future<LatLng?> getCurrentUserPosition() async {
     try {
+      // Vérifier si on est sur le web
+      if (kIsWeb) {
+        return await _getWebLocation();
+      }
+
+      // Code mobile existant
       location_package.Location location = location_package.Location();
       bool serviceEnabled = await location.serviceEnabled();
       if (!serviceEnabled) {
@@ -53,17 +61,47 @@ class MapService {
     }
   }
 
+  /// Récupération de la position sur le web avec fallbacks
+  Future<LatLng?> _getWebLocation() async {
+    try {
+      // Utiliser le helper web pour la géolocalisation
+      final positionData = await WebLocationHelper.getCurrentPosition();
+
+      if (positionData != null) {
+        return LatLng(
+          positionData['latitude'].toDouble(),
+          positionData['longitude'].toDouble(),
+        );
+      }
+
+      // Fallback vers une position par défaut
+      return initialPosition;
+    } catch (e) {
+      print('Erreur géolocalisation web: $e');
+      print(WebLocationHelper.getErrorMessage(e));
+      // Fallback vers une position par défaut
+      return initialPosition;
+    }
+  }
+
   // Alias pour getCurrentUserPosition
   Future<LatLng?> getCurrentPosition() async {
     return getCurrentUserPosition();
   }
 
-  // Géocodage inverse : obtenir une adresse à partir de coordonnées
+  // Géocodage inverse : obtenir une adresse à partir de coordonnées avec fallback web
   Future<String> getAddressFromLatLng(LatLng position) async {
     try {
       if (position.latitude == 0 && position.longitude == 0) {
         return "Position non définie";
       }
+
+      // Vérifier si on est sur le web
+      if (kIsWeb) {
+        return await _getWebAddressFromLatLng(position);
+      }
+
+      // Code mobile existant
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -79,6 +117,26 @@ class MapService {
       print(stack);
       return "Erreur lors de la récupération de l'adresse";
     }
+  }
+
+  /// Géocodage inverse pour le web avec fallback
+  Future<String> _getWebAddressFromLatLng(LatLng position) async {
+    try {
+      // Essayer d'abord avec le package geocoding
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        return "${placemark.street ?? ''}, ${placemark.locality ?? ''}";
+      }
+    } catch (e) {
+      print('Erreur geocoding web: $e');
+    }
+
+    // Fallback : utiliser une API de géocodage alternative ou retourner des coordonnées
+    return "Position: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
   }
 
   Future<void> saveAddressForCurrentUser({
@@ -127,11 +185,17 @@ class MapService {
     }
   }
 
-  // Suggérer des adresses basées sur une requête
+  // Suggérer des adresses basées sur une requête avec support web
   Future<List<Map<String, dynamic>>> suggestAddresses(String query) async {
     if (query.isEmpty) return [];
 
     try {
+      // Vérifier si on est sur le web
+      if (kIsWeb) {
+        return await _suggestWebAddresses(query);
+      }
+
+      // Code mobile existant
       List<Location> locations = await locationFromAddress(query);
       List<Map<String, dynamic>> suggestions = [];
 
@@ -159,6 +223,50 @@ class MapService {
     } catch (e) {
       print('Erreur lors de la suggestion d\'adresses: $e');
       return [];
+    }
+  }
+
+  /// Suggestions d'adresses pour le web avec fallback
+  Future<List<Map<String, dynamic>>> _suggestWebAddresses(String query) async {
+    try {
+      // Essayer d'abord avec le package geocoding
+      List<Location> locations = await locationFromAddress(query);
+      List<Map<String, dynamic>> suggestions = [];
+
+      for (Location location in locations) {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          location.latitude,
+          location.longitude,
+        );
+
+        if (placemarks.isNotEmpty) {
+          Placemark placemark = placemarks.first;
+          suggestions.add({
+            'address':
+                '${placemark.street ?? ''}, ${placemark.locality ?? ''}, ${placemark.country ?? ''}',
+            'latitude': location.latitude,
+            'longitude': location.longitude,
+            'street': placemark.street,
+            'locality': placemark.locality,
+            'country': placemark.country,
+          });
+        }
+      }
+
+      return suggestions;
+    } catch (e) {
+      print('Erreur suggestion web: $e');
+      // Fallback : retourner des suggestions basiques
+      return [
+        {
+          'address': query,
+          'latitude': initialPosition.latitude,
+          'longitude': initialPosition.longitude,
+          'street': query,
+          'locality': 'Yaoundé',
+          'country': 'Cameroun',
+        },
+      ];
     }
   }
 

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:location/location.dart';
 import '../../services/map_service.dart';
 import '../../services/auth_service.dart';
+import '../web_location_info.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 class EnhancedMapWidget extends StatefulWidget {
   final VoidCallback? onTap;
@@ -51,35 +52,33 @@ class _EnhancedMapWidgetState extends State<EnhancedMapWidget> {
 
   Future<void> _getCurrentLocation() async {
     try {
-      Location location = Location();
-      bool serviceEnabled = await location.serviceEnabled();
-      if (!serviceEnabled) {
-        serviceEnabled = await location.requestService();
-        if (!serviceEnabled) {
-          return;
-        }
-      }
+      // Utiliser le service de carte amélioré qui gère le web
+      final pos = await _mapService.getCurrentUserPosition();
 
-      PermissionStatus permissionGranted = await location.hasPermission();
-      if (permissionGranted == PermissionStatus.denied) {
-        permissionGranted = await location.requestPermission();
-        if (permissionGranted != PermissionStatus.granted) {
-          return;
-        }
-      }
-
-      final locData = await location.getLocation();
-      final pos = LatLng(locData.latitude!, locData.longitude!);
-
-      if (mounted) {
+      if (pos != null && mounted) {
         setState(() {
           _currentPosition = pos;
           _mapCenter = pos;
         });
         _updateAddressFromCenter(pos);
+      } else if (mounted) {
+        // Fallback vers la position par défaut si la géolocalisation échoue
+        setState(() {
+          _currentPosition = _mapService.initialPosition;
+          _mapCenter = _mapService.initialPosition;
+        });
+        _updateAddressFromCenter(_mapService.initialPosition);
       }
     } catch (e) {
       debugPrint('Erreur lors de la récupération de la position: $e');
+      // En cas d'erreur, utiliser la position par défaut
+      if (mounted) {
+        setState(() {
+          _currentPosition = _mapService.initialPosition;
+          _mapCenter = _mapService.initialPosition;
+        });
+        _updateAddressFromCenter(_mapService.initialPosition);
+      }
     }
   }
 
@@ -357,163 +356,199 @@ class _EnhancedMapWidgetState extends State<EnhancedMapWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 280,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            // Carte principale
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _mapCenter,
-                initialZoom: 15,
-                minZoom: 10,
-                maxZoom: 18,
-                onMapEvent: (event) {
-                  if (event is MapEventMoveEnd) {
-                    _updateAddressFromCenter(_mapCenter);
-                  }
-                },
+    return Column(
+      children: [
+        // Information sur les restrictions web
+        if (kIsWeb) const WebLocationInfo(),
+
+        // Carte principale
+        Container(
+          height: 280,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
               children: [
-                TileLayer(
-                  urlTemplate:
-                      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                  subdomains: ['a', 'b', 'c', 'd'],
-                  userAgentPackageName: 'com.example.safetytrack',
-                  retinaMode: RetinaMode.isHighDensity(context),
+                // Carte principale
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _mapCenter,
+                    initialZoom: 15,
+                    minZoom: 10,
+                    maxZoom: 18,
+                    onMapEvent: (event) {
+                      if (event is MapEventMoveEnd) {
+                        _updateAddressFromCenter(_mapCenter);
+                      }
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                      subdomains: ['a', 'b', 'c', 'd'],
+                      userAgentPackageName: 'com.example.safetytrack',
+                      retinaMode: RetinaMode.isHighDensity(context),
+                    ),
+                    MarkerLayer(markers: _buildMarkers()),
+                  ],
                 ),
-                MarkerLayer(markers: _buildMarkers()),
+
+                // Overlay d'adresse
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: const Color(0xFF179D5B),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _address,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Indicateur web si nécessaire
+                        if (kIsWeb && _address.contains('Position:'))
+                          Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.orange.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              'Web',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                color: Colors.orange[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Légende des marqueurs (si activée)
+                if (widget.showLegend)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Légende',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildLegendItem(
+                            const Color(0xFF179D5B),
+                            'Vous',
+                            Icons.my_location,
+                          ),
+                          _buildLegendItem(
+                            Colors.purple,
+                            'Enfants',
+                            Icons.person,
+                          ),
+                          _buildLegendItem(
+                            const Color(0xFFFF5722),
+                            'Zones d\'alerte',
+                            Icons.warning,
+                          ),
+                          _buildLegendItem(
+                            Colors.blue,
+                            'Adresses',
+                            Icons.location_on,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Bouton de centrage
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  child: FloatingActionButton.small(
+                    onPressed:
+                        _currentPosition != null
+                            ? () {
+                              _mapController.move(_currentPosition!, 15);
+                            }
+                            : null,
+                    backgroundColor: const Color(0xFF179D5B),
+                    foregroundColor: Colors.white,
+                    child: const Icon(Icons.my_location),
+                  ),
+                ),
               ],
             ),
-
-            // Overlay d'adresse
-            Positioned(
-              top: 16,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.location_on,
-                      color: const Color(0xFF179D5B),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _address,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Légende des marqueurs (si activée)
-            if (widget.showLegend)
-              Positioned(
-                bottom: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Légende',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildLegendItem(
-                        const Color(0xFF179D5B),
-                        'Vous',
-                        Icons.my_location,
-                      ),
-                      _buildLegendItem(Colors.purple, 'Enfants', Icons.person),
-                      _buildLegendItem(
-                        const Color(0xFFFF5722),
-                        'Zones d\'alerte',
-                        Icons.warning,
-                      ),
-                      _buildLegendItem(
-                        Colors.blue,
-                        'Adresses',
-                        Icons.location_on,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // Bouton de centrage
-            Positioned(
-              bottom: 16,
-              left: 16,
-              child: FloatingActionButton.small(
-                onPressed:
-                    _currentPosition != null
-                        ? () {
-                          _mapController.move(_currentPosition!, 15);
-                        }
-                        : null,
-                backgroundColor: const Color(0xFF179D5B),
-                foregroundColor: Colors.white,
-                child: const Icon(Icons.my_location),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
